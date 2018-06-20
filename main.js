@@ -1,9 +1,7 @@
 const { SHA256 }  = require('crypto-js');
 const block_chain = {};
-const merkle_tree  = {};
 const go = (seed, ...fns) => fns.reduce((res, f) => f(res), seed);
 const tap = fn => arg => (fn(arg), arg);
-var prev_hash = '';
 
 function make_block(time, trx, prev = '', diff = 2) {
   let { nonce, hash } = mining(prev, time, trx, diff, 0);
@@ -25,6 +23,8 @@ function mining(prev, time, trx, diff, nonce){
   return { hash, nonce };
 }
 
+var d = 2, prev_hash = '';
+
 function add_block(block) {
   // 검증 절차를 거친 뒤 아래 활동을 해야함
   // 채굴에 성공한 노드가 보상을 받아감
@@ -33,17 +33,16 @@ function add_block(block) {
   return block_chain;
 }
 
-var i = 2;
 console.log('\n\n< 체인 시작 />')
 !function recur(trx) {
   console.log("\n\n=== 채굴 시작 ===");
   return go(
-    make_block(new Date(), trx, prev_hash, i++),
+    make_block(new Date(), trx, prev_hash, d++),
     tap(console.log),
     add_block,
     function(chain) {
       console.log(`=== 채굴 성공: 블록 길이 => ${Object.keys(chain).length} ===`)
-      return i < 5 ? recur(trx) : console.log('\n\n< 체인 종료 />');
+      return d < 5 ? recur(trx) : console.log('\n\n< 체인 종료 />');
     }
   )
 }([{ a: 10, b: -10 }, { a: -10, b: 20, c: -10 }])
