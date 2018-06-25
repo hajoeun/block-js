@@ -3,24 +3,21 @@ const block_chain = {};
 const go = (seed, ...fns) => fns.reduce((res, f) => f(res), seed);
 const tap = fn => arg => (fn(arg), arg);
 
-function make_block(time, trx, prev = '', diff = 2) {
-  let { nonce, hash } = mining(prev, time, trx, diff, 0);
-  return {
-    previousHash: prev,
-    timestamp: time,
-    transactions: trx, 
-    nonce,
-    hash
+function mining(previousHash, timestamp, transactions, diff) {
+  let block = { previousHash, timestamp, transactions, nonce: 0 };
+  block.hash = calculate_hash(block);
+  
+  while (block.hash.substring(0, diff) !== Array(diff + 1).join('0')) {
+    block.nonce++;
+    block.hash = calculate_hash(block);
   }
+
+  return block;
 }
 
-function mining(prev, time, trx, diff, nonce){
-  let hash = SHA256(prev + time + JSON.stringify(trx) + nonce).toString();
-  
-  while (hash.substring(0, diff) !== Array(diff + 1).join("0"))
-    hash = SHA256(prev + time + JSON.stringify(trx) + (++nonce)).toString();
-
-  return { hash, nonce };
+function calculate_hash(block) {
+  let { previousHash, timestamp, transactions, nonce } = block;
+  return SHA256(previousHash + timestamp + JSON.stringify(transactions) + nonce).toString();
 }
 
 var d = 2, prev_hash = '';
@@ -37,7 +34,7 @@ console.log('\n\n< 체인 시작 />')
 !function recur(trx) {
   console.log("\n\n=== 채굴 시작 ===");
   return go(
-    make_block(new Date(), trx, prev_hash, d++),
+    mining(prev_hash, new Date(), trx, d++),
     tap(console.log),
     add_block,
     function(chain) {
@@ -46,4 +43,3 @@ console.log('\n\n< 체인 시작 />')
     }
   )
 }([{ a: 10, b: -10 }, { a: -10, b: 20, c: -10 }])
-
