@@ -1,17 +1,11 @@
 const { SHA256 }  = require('crypto-js');
 const go = (seed, ...fns) => fns.reduce((res, f) => f(res), seed);
-const tap = fn => arg => (fn(arg), arg);
-
 let G = typeof window == 'object' ? window : global;
 
 G.CHAIN = {};
 G.DIFF = 2;
 G.HEAD = '';
-G.USERS = {
-  '0001': { name: 'A', balance: 70 },
-  '0002': { name: 'B', balance: 50 },
-  '0003': { name: 'C', balance: 110 }
-};
+G.TRX = [];
 
 function mining(previousHash, timestamp, transactions, diff) {
   let block = { previousHash, timestamp, transactions, nonce: 0 };
@@ -45,10 +39,35 @@ function is_block_valid(block) {
 function reward_to(address) {
   return function(is_success) {
     if (is_success) {
-     G.USERS[address].balance += G.DIFF * 10;
-     G.DIFF++;
+      G.TRX = [];
+      transaction('0000', address, G.DIFF * 10);
+      G.DIFF++;
     }
   }
+}
+
+function transaction(fromAddress, toAddress, amount) {
+  if (get_balance(fromAddress) >= amount)
+    G.TRX.push({ fromAddress, toAddress, amount });
+  return G.TRX;
+}
+
+function get_balance(address) {
+  if (address === '0000') return 1000;
+  return G.TRX.reduce((bal, trx) => {
+    if (trx.fromAddress === address) bal -= trx.amount;
+    if (trx.toAddress === address) bal += trx.amount;
+    return bal;
+  }, get_balance_from_chain(address));
+}
+
+function get_balance_from_chain(address) {
+  return Object.keys(G.CHAIN).reduce((sum, key) =>
+    G.CHAIN[key].transactions.reduce((bal, trx) => {
+      if (trx.fromAddress === address) bal -= trx.amount;
+      if (trx.toAddress === address) bal += trx.amount;
+      return bal;
+    }, sum), 0);
 }
 
 function is_chain_valid(chain) {
@@ -64,18 +83,24 @@ function is_chain_valid(chain) {
 
 const MY_ADDRESS = '0001';
 
-console.log('\n\n< 체인 시작 />');
-!function recur(trx) {
-  console.log("\n\n=== 채굴 시작 ===");
-  return go(
-    mining(G.HEAD, new Date(), trx, G.DIFF),
-    tap(console.log),
-    add_block,
-    tap(reward_to(MY_ADDRESS)),
-    function(is_success) {
-      let chain = G.CHAIN;
-      console.log(`=== 채굴 ${is_success ? '성공' : '실패'}: 블록 길이 => ${Object.keys(chain).length} ===`);
-      return G.DIFF < 5 ? recur(trx) : console.log(`\n== 현재 잔액 ${G.USERS[MY_ADDRESS].balance} | 체인 유효성 ${is_chain_valid(chain)} ==\n< 체인 종료 />`);
-    }
-  )
-}([{ A: -10, B: 10 }]);
+transaction('0000', '0001', 100);
+transaction(MY_ADDRESS, '0002', 20);
+transaction(MY_ADDRESS, '0003', 30);
+
+go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
+  add_block,
+  reward_to(MY_ADDRESS),
+  () => console.log('Block Chain:', G.CHAIN),
+  () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
+
+console.log('\n =================== \n');
+
+transaction('0003', MY_ADDRESS, 10);
+
+go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
+  add_block,
+  reward_to(MY_ADDRESS),
+  () => console.log('Block Chain:', G.CHAIN),
+  () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
+
+console.log('Chain Valid: ', is_chain_valid(G.CHAIN));
