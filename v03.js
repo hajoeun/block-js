@@ -52,33 +52,21 @@ function transaction(fromAddress, toAddress, amount) {
   return G.TRX;
 }
 
+function sum_balance(trx, init, address) {
+  return trx.reduce((b, t) => {
+    if (t.fromAddress === address) b -= t.amount;
+    if (t.toAddress === address) b += t.amount;
+    return b;
+  }, init);
+}
+
 function get_balance(address) {
   if (address === '0000') return 1000;
-  return G.TRX.reduce((bal, trx) => {
-    if (trx.fromAddress === address) bal -= trx.amount;
-    if (trx.toAddress === address) bal += trx.amount;
-    return bal;
-  }, get_balance_from_chain(address));
+  return sum_balance(G.TRX, balance_from_chain(address), address);
 }
 
-function get_balance_from_chain(address) {
-  return Object.keys(G.CHAIN).reduce((sum, key) =>
-    G.CHAIN[key].transactions.reduce((bal, trx) => {
-      if (trx.fromAddress === address) bal -= trx.amount;
-      if (trx.toAddress === address) bal += trx.amount;
-      return bal;
-    }, sum), 0);
-}
-
-function is_chain_valid(chain) {
-  return Object.keys(chain).every(hash => {
-    const current = chain[hash];
-    const previous = chain[current.previousHash];
-    if (!previous) return true; // Genesis Block
-    if (hash !== calculate_hash(current)) return false;
-    if (current.previousHash !== calculate_hash(previous)) return false;
-    return true;
-  });
+function balance_from_chain(address) {
+  return Object.keys(G.CHAIN).reduce((sum, key) => sum_balance(G.CHAIN[key].transactions, sum, address), 0);
 }
 
 const MY_ADDRESS = '0001';
@@ -86,14 +74,11 @@ const MY_ADDRESS = '0001';
 transaction('0000', '0001', 100);
 transaction(MY_ADDRESS, '0002', 20);
 transaction(MY_ADDRESS, '0003', 30);
+transaction(MY_ADDRESS, '0003', 300); // <-- 잔액 부족!
 
 go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
   add_block,
-  reward_to(MY_ADDRESS),
-  () => console.log('Block Chain:', G.CHAIN),
-  () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
-
-console.log('\n =================== \n');
+  reward_to(MY_ADDRESS));
 
 transaction('0003', MY_ADDRESS, 10);
 
@@ -102,5 +87,3 @@ go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
   reward_to(MY_ADDRESS),
   () => console.log('Block Chain:', G.CHAIN),
   () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
-
-console.log('Chain Valid: ', is_chain_valid(G.CHAIN));

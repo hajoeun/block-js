@@ -52,22 +52,21 @@ function transaction(fromAddress, toAddress, amount) {
   return G.TRX;
 }
 
-function get_balance(address) {
-  if (address === '0000') return 1000;
-  return G.TRX.reduce((bal, trx) => {
-    if (trx.fromAddress === address) bal -= trx.amount;
-    if (trx.toAddress === address) bal += trx.amount;
-    return bal;
-  }, get_balance_from_chain(address));
+function sum_balance(trx, init, address) {
+  return trx.reduce((b, t) => {
+    if (t.fromAddress === address) b -= t.amount;
+    if (t.toAddress === address) b += t.amount;
+    return b;
+  }, init);
 }
 
-function get_balance_from_chain(address) {
-  return Object.keys(G.CHAIN).reduce((sum, key) =>
-    G.CHAIN[key].transactions.reduce((bal, trx) => {
-      if (trx.fromAddress === address) bal -= trx.amount;
-      if (trx.toAddress === address) bal += trx.amount;
-      return bal;
-    }, sum), 0);
+function get_balance(address) {
+  if (address === '0000') return 1000;
+  return sum_balance(G.TRX, balance_from_chain(address), address);
+}
+
+function balance_from_chain(address) {
+  return Object.keys(G.CHAIN).reduce((sum, key) => sum_balance(G.CHAIN[key].transactions, sum, address), 0);
 }
 
 function is_chain_valid(chain) {
@@ -92,8 +91,6 @@ go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
   reward_to(MY_ADDRESS),
   () => console.log('Block Chain:', G.CHAIN),
   () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
-
-console.log('\n =================== \n');
 
 transaction('0003', MY_ADDRESS, 10);
 
