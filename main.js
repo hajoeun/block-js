@@ -79,6 +79,7 @@ function is_chain_valid(chain) {
   });
 }
 
+/* 거래 발생 및 채굴 */
 const MY_ADDRESS = '0001';
 
 transaction('0000', '0001', 100);
