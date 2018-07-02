@@ -1,5 +1,5 @@
 const { SHA256 }  = require('crypto-js');
-const go = (seed, ...fns) => fns.reduce((res, f) => f(res), seed);
+const { go, every, reduce, keys } = require('./lib/functions');
 let G = typeof window == 'object' ? window : global;
 
 G.CHAIN = {};
@@ -53,7 +53,7 @@ function transaction(fromAddress, toAddress, amount) {
 }
 
 function sum_balance(trx, init, address) {
-  return trx.reduce((b, t) => {
+  return reduce(trx, (b, t) => {
     if (t.fromAddress === address) b -= t.amount;
     if (t.toAddress === address) b += t.amount;
     return b;
@@ -66,16 +66,15 @@ function get_balance(address) {
 }
 
 function balance_from_chain(address) {
-  return Object.keys(G.CHAIN).reduce((sum, key) => sum_balance(G.CHAIN[key].transactions, sum, address), 0);
+  return reduce(G.CHAIN, (sum, block) => sum_balance(block.transactions, sum, address), 0);
 }
 
 function is_chain_valid(chain) {
-  return Object.keys(chain).every(hash => {
-    const current = chain[hash];
-    const previous = chain[current.previousHash];
+  return every(chain, block => {
+    const previous = chain[block.previousHash];
     if (!previous) return true; // Genesis Block
-    if (hash !== calculate_hash(current)) return false;
-    if (current.previousHash !== calculate_hash(previous)) return false;
+    if (block.hash !== calculate_hash(block)) return false;
+    if (block.previousHash !== calculate_hash(previous)) return false;
     return true;
   });
 }
@@ -84,13 +83,13 @@ const MY_ADDRESS = '0001';
 
 transaction('0000', '0001', 100);
 transaction(MY_ADDRESS, '0002', 20);
-transaction(MY_ADDRESS, '0003', 30);
+transaction(MY_ADDRESS, '0003', 30); // <-- 잔액 부족!
 
 go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
   add_block,
   reward_to(MY_ADDRESS),
   () => console.log('Block Chain:', G.CHAIN),
-  () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
+  () => console.log('My Balance:', get_balance(MY_ADDRESS)));
 
 transaction('0003', MY_ADDRESS, 10);
 
@@ -98,6 +97,15 @@ go(mining(G.HEAD, new Date(), G.TRX, G.DIFF),
   add_block,
   reward_to(MY_ADDRESS),
   () => console.log('Block Chain:', G.CHAIN),
-  () => console.log(`My Balance:`, get_balance(MY_ADDRESS)));
+  () => console.log('My Balance:', get_balance(MY_ADDRESS)));
 
-console.log('Chain Valid: ', is_chain_valid(G.CHAIN));
+/* 체인 유효성 검사 */
+let hash_key = keys(G.CHAIN)[1];
+
+console.log('[ Before ]\n Chain Valid: ', is_chain_valid(G.CHAIN)); // true
+console.log('Transactions: ', G.CHAIN[hash_key].transactions, '\n');
+
+G.CHAIN[hash_key].transactions[1].amount = 0; // 거래를 조작
+
+console.log('[ After ]\n Chain Valid: ', is_chain_valid(G.CHAIN)); // false
+console.log('Transactions: ', G.CHAIN[hash_key].transactions);
