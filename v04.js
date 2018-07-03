@@ -72,8 +72,8 @@ function balance_from_chain(address) {
 function is_chain_valid(chain) {
   return every(chain, block => {
     const previous = chain[block.previousHash];
-    if (!previous) return true; // Genesis Block
     if (block.hash !== calculate_hash(block)) return false;
+    if (block.previousHash === '') return true; // Genesis Block
     if (block.previousHash !== calculate_hash(previous)) return false;
     return true;
   });
